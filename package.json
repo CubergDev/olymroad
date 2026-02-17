@@ -1,0 +1,18 @@
+{
+  "name": "olymroad",
+  "private": true,
+  "packageManager": "bun@1.3.7",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "bun run --parallel --filter @olymroad/api --filter @olymroad/web --if-present dev",
+    "dev:api": "bun run --filter @olymroad/api dev",
+    "dev:web": "bun run --filter @olymroad/web dev",
+    "build": "bun run --filter @olymroad/api build && bun run --filter @olymroad/web build",
+    "build:api": "bun run --filter @olymroad/api build",
+    "build:web": "bun run --filter @olymroad/web build",
+    "check:web": "bun run --filter @olymroad/web check",
+    "mobile:sync": "bun run --filter @olymroad/web mobile:sync"
+  }
+}

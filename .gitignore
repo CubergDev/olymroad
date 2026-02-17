@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+build/
+dist/
+coverage/
+
+# SvelteKit
+.svelte-kit/
+apps/web/.svelte-kit/
+apps/web/build/
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE/editor
+.idea/
+*.iml
+
+# Local agent instructions
+AGENTS.md
+
+# OS files
+.DS_Store
+Thumbs.db
