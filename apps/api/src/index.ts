@@ -10,7 +10,7 @@ import { registerTeacherRoutes } from "./routes/teacher";
 import { registerAnalyticsRoutes } from "./routes/analytics";
 import { registerNotificationRoutes } from "./routes/notifications";
 
-const app = new Elysia();
+export const app = new Elysia();
 
 registerHealthRoutes(app);
 registerAuthProfileRoutes(app);
@@ -22,6 +22,9 @@ registerTeacherRoutes(app);
 registerAnalyticsRoutes(app);
 registerNotificationRoutes(app);
 
-app.listen(CONFIG.port);
-
-console.log(`OlymRoad API running on ${app.server?.hostname}:${app.server?.port}`);
+if (import.meta.main) {
+  app.listen(CONFIG.port);
+  console.log(
+    `OlymRoad API running on ${app.server?.hostname}:${app.server?.port}`
+  );
+}
