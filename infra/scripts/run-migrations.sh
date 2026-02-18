@@ -26,7 +26,8 @@ IFS='
 for file in $migration_files; do
 
   version="$(basename "$file")"
-  already_applied="$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 --set=version="$version" -c "SELECT 1 FROM schema_migrations WHERE version = :'version' LIMIT 1;")"
+  escaped_version="$(printf "%s" "$version" | sed "s/'/''/g")"
+  already_applied="$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 -c "SELECT 1 FROM schema_migrations WHERE version = '$escaped_version' LIMIT 1;")"
 
   if [ "$already_applied" = "1" ]; then
     echo "Skipping already-applied migration: $version"
@@ -35,7 +36,7 @@ for file in $migration_files; do
 
   echo "Applying migration: $version"
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
-  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 --set=version="$version" -c "INSERT INTO schema_migrations(version) VALUES (:'version');"
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "INSERT INTO schema_migrations(version) VALUES ('$escaped_version');"
   applied_any=1
 done
 IFS="$old_ifs"
