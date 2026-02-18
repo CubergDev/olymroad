@@ -3,6 +3,7 @@ import { issueToken, requireRole, requireUser, toPublicUser } from "../auth";
 import { dbErrorCode, first, sql } from "../db";
 import { fail } from "../http";
 import {
+  getEmailString,
   getInteger,
   getNullableString,
   getString,
@@ -18,7 +19,7 @@ export const registerAuthProfileRoutes = (app: Elysia) => {
     }
 
     const name = getString(body.name);
-    const email = getString(body.email)?.toLowerCase();
+    const email = getEmailString(body.email);
     const password = getString(body.password);
     const requestedRoleRaw = getString(body.role);
     const requestedRole = requestedRoleRaw ?? "student";
@@ -29,6 +30,9 @@ export const registerAuthProfileRoutes = (app: Elysia) => {
 
     if (!name || !email || !password) {
       return fail(set, 400, "validation_error", "Name, email, and password are required.");
+    }
+    if (name.length > 255) {
+      return fail(set, 400, "validation_error", "Name must be less than 255 characters.");
     }
     if (password.length < 8) {
       return fail(set, 400, "validation_error", "Password must be at least 8 characters.");
@@ -97,7 +101,7 @@ export const registerAuthProfileRoutes = (app: Elysia) => {
     if (!isRecord(body)) {
       return fail(set, 400, "validation_error", "Invalid request body.");
     }
-    const email = getString(body.email)?.toLowerCase();
+    const email = getEmailString(body.email);
     const password = getString(body.password);
 
     if (!email || !password) {
@@ -186,6 +190,9 @@ export const registerAuthProfileRoutes = (app: Elysia) => {
 
     if (hasSchool && typeof school === "undefined") {
       return fail(set, 400, "validation_error", "school must be a string or null.");
+    }
+    if (hasSchool && school !== null && school.length > 500) {
+      return fail(set, 400, "validation_error", "school must be less than 500 characters.");
     }
     if (hasGrade && body.grade !== null && grade === null) {
       return fail(set, 400, "validation_error", "grade must be an integer or null.");

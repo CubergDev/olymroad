@@ -5,6 +5,7 @@ import { fail } from "../http";
 import {
   getInteger,
   getNumber,
+  getNullableInteger,
   getNullableString,
   getString,
   isRecord,
@@ -404,14 +405,14 @@ export const registerRoadmapRegistrationResultRoutes = (app: Elysia) => {
 
     const stageId = getInteger(params.id);
     const score = getNumber(body.score);
-    const place = body.place === null || body.place === undefined ? null : getInteger(body.place);
+    const place = getNullableInteger(body.place);
     const statusRaw = getString(body.status);
     const comment = getNullableString(body.comment);
 
     if (!stageId || score === null || !statusRaw || !isResultStatus(statusRaw)) {
       return fail(set, 400, "validation_error", "Missing required result fields.");
     }
-    if (body.place !== undefined && body.place !== null && place === null) {
+    if (body.place !== undefined && place === undefined) {
       return fail(set, 400, "validation_error", "place must be an integer or null.");
     }
     if (body.comment !== undefined && comment === undefined) {

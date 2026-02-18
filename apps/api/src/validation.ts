@@ -80,6 +80,16 @@ export const getInteger = (value: unknown): number | null => {
   return parsed !== null && Number.isInteger(parsed) ? parsed : null;
 };
 
+export const getNullableInteger = (value: unknown): number | null | undefined => {
+  if (value === null) {
+    return null;
+  }
+  if (typeof value === "undefined") {
+    return undefined;
+  }
+  return getInteger(value);
+};
+
 export const getDateString = (value: unknown): string | null => {
   if (typeof value !== "string") {
     return null;
@@ -96,6 +106,18 @@ export const getUuidString = (value: unknown): string | null => {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     normalized
   )
+    ? normalized
+    : null;
+};
+
+export const getEmailString = (value: unknown): string | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  // Basic email validation regex
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(normalized) && normalized.length <= 255
     ? normalized
     : null;
 };
