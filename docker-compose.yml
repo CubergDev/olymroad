@@ -2,7 +2,7 @@ name: olymroad-dev
 
 services:
   postgres:
-    image: public.ecr.aws/docker/library/postgres:17-alpine
+    image: postgres:17-alpine@sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-olymroad}
       POSTGRES_USER: ${POSTGRES_USER:-olymroad}
@@ -20,7 +20,7 @@ services:
     restart: unless-stopped
 
   minio:
-    image: quay.io/minio/minio:latest
+    image: minio/minio:latest@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-olymroad}
@@ -33,7 +33,7 @@ services:
     restart: unless-stopped
 
   minio-init:
-    image: quay.io/minio/mc:latest
+    image: minio/mc:latest@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
     depends_on:
       - minio
     environment:
@@ -46,7 +46,7 @@ services:
     restart: "no"
 
   migrate:
-    image: public.ecr.aws/docker/library/postgres:17-alpine
+    image: postgres:17-alpine@sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af
     depends_on:
       postgres:
         condition: service_healthy
