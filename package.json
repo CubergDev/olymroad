@@ -13,6 +13,12 @@
     "build:api": "bun run --filter @olymroad/api build",
     "build:web": "bun run --filter @olymroad/web build",
     "check:web": "bun run --filter @olymroad/web check",
-    "mobile:sync": "bun run --filter @olymroad/web mobile:sync"
+    "mobile:sync": "bun run --filter @olymroad/web mobile:sync",
+    "infra:up": "docker compose up -d --wait postgres minio && docker compose run --rm minio-init && docker compose run --rm migrate",
+    "infra:down": "docker compose down",
+    "infra:reset": "docker compose down -v --remove-orphans",
+    "infra:logs": "docker compose logs -f postgres minio migrate minio-init",
+    "db:migrate": "docker compose up -d --wait postgres && docker compose run --rm migrate",
+    "minio:init": "docker compose run --rm minio-init"
   }
 }

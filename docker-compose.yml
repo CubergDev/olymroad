@@ -1,0 +1,63 @@
+name: olymroad-dev
+
+services:
+  postgres:
+    image: public.ecr.aws/docker/library/postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-olymroad}
+      POSTGRES_USER: ${POSTGRES_USER:-olymroad}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-olymroad_dev_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-olymroad}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-olymroad_dev_password}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+
+  minio-init:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-olymroad}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-olymroad_dev_password}
+      MINIO_BUCKET: ${MINIO_BUCKET:-olymroad-dev}
+    volumes:
+      - ./infra/scripts:/infra/scripts:ro
+    entrypoint: ["/bin/sh", "/infra/scripts/init-minio.sh"]
+    restart: "no"
+
+  migrate:
+    image: public.ecr.aws/docker/library/postgres:17-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgresql://olymroad:olymroad_dev_password@postgres:5432/olymroad}
+    volumes:
+      - ./infra/scripts:/infra/scripts:ro
+      - ./db/migrations:/migrations:ro
+    entrypoint: ["/bin/sh", "/infra/scripts/run-migrations.sh"]
+    restart: "no"
+
+volumes:
+  pg_data:
+  minio_data:
