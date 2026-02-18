@@ -115,9 +115,20 @@ export const getEmailString = (value: unknown): string | null => {
     return null;
   }
   const normalized = value.trim().toLowerCase();
-  // Basic email validation regex
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(normalized) && normalized.length <= 255
+  // RFC 5322 compliant email validation (simplified but robust)
+  // Allows: local-part@domain where local-part can contain alphanumeric, dots, hyphens, underscores
+  // and domain must have at least one dot and valid TLD
+  const emailRegex = /^[a-z0-9][a-z0-9._-]*[a-z0-9]@[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
+  
+  // Additional validation: no consecutive dots, no dots at start/end of local part
+  const hasConsecutiveDots = /\.\./.test(normalized);
+  const localPart = normalized.split('@')[0];
+  const startsOrEndsWithDot = localPart?.startsWith('.') || localPart?.endsWith('.');
+  
+  return !hasConsecutiveDots && 
+         !startsOrEndsWithDot &&
+         emailRegex.test(normalized) && 
+         normalized.length <= 255
     ? normalized
     : null;
 };

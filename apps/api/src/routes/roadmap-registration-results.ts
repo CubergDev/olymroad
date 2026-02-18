@@ -412,7 +412,7 @@ export const registerRoadmapRegistrationResultRoutes = (app: Elysia) => {
     if (!stageId || score === null || !statusRaw || !isResultStatus(statusRaw)) {
       return fail(set, 400, "validation_error", "Missing required result fields.");
     }
-    if (body.place !== undefined && place === undefined) {
+    if (body.place !== undefined && body.place !== null && place === null) {
       return fail(set, 400, "validation_error", "place must be an integer or null.");
     }
     if (body.comment !== undefined && comment === undefined) {
