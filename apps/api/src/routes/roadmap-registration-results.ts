@@ -7,6 +7,7 @@ import {
   getNumber,
   getNullableString,
   getString,
+  isRecord,
   isRegistrationStatus,
   isResultStatus,
   normalizeChecklist,
@@ -302,12 +303,12 @@ export const registerRoadmapRegistrationResultRoutes = (app: Elysia) => {
     if (!requireRole(user, ["student"], set)) {
       return fail(set, 403, "forbidden", "Only students can update registration status.");
     }
-    if (!body || typeof body !== "object") {
+    if (!isRecord(body)) {
       return fail(set, 400, "validation_error", "Invalid request body.");
     }
 
     const stageId = getInteger(params.id);
-    const nextStatusRaw = getString((body as Record<string, unknown>).status);
+    const nextStatusRaw = getString(body.status);
     if (!stageId || !nextStatusRaw || !isRegistrationStatus(nextStatusRaw)) {
       return fail(set, 400, "validation_error", "Valid stage id and status are required.");
     }
@@ -397,24 +398,23 @@ export const registerRoadmapRegistrationResultRoutes = (app: Elysia) => {
     if (!requireRole(user, ["student"], set)) {
       return fail(set, 403, "forbidden", "Only students can add results.");
     }
-    if (!body || typeof body !== "object") {
+    if (!isRecord(body)) {
       return fail(set, 400, "validation_error", "Invalid request body.");
     }
 
-    const payload = body as Record<string, unknown>;
     const stageId = getInteger(params.id);
-    const score = getNumber(payload.score);
-    const place = payload.place === null || payload.place === undefined ? null : getInteger(payload.place);
-    const statusRaw = getString(payload.status);
-    const comment = getNullableString(payload.comment);
+    const score = getNumber(body.score);
+    const place = body.place === null || body.place === undefined ? null : getInteger(body.place);
+    const statusRaw = getString(body.status);
+    const comment = getNullableString(body.comment);
 
     if (!stageId || score === null || !statusRaw || !isResultStatus(statusRaw)) {
       return fail(set, 400, "validation_error", "Missing required result fields.");
     }
-    if (payload.place !== undefined && payload.place !== null && place === null) {
+    if (body.place !== undefined && body.place !== null && place === null) {
       return fail(set, 400, "validation_error", "place must be an integer or null.");
     }
-    if (payload.comment !== undefined && comment === undefined) {
+    if (body.comment !== undefined && comment === undefined) {
       return fail(set, 400, "validation_error", "comment must be a string or null.");
     }
 
