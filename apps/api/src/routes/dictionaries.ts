@@ -86,7 +86,25 @@ const listDictionaries = async (includeInactive: boolean) => {
     ORDER BY sort_order ASC, id ASC
   `) as DictionaryRow[];
 
-  return { subjects, levels, regions };
+  const topicFrameworks = await sql`
+    SELECT id, subject_code, name_ru, name_kz, description
+    FROM topic_frameworks
+    ORDER BY id ASC
+  `;
+
+  const topics = await sql`
+    SELECT id, framework_id, parent_id, name_ru, name_kz, tags, sort_order
+    FROM topics
+    ORDER BY framework_id ASC, sort_order ASC, id ASC
+  `;
+
+  return {
+    subjects,
+    levels,
+    regions,
+    topic_frameworks: topicFrameworks,
+    topics,
+  };
 };
 
 const ensureAdmin = async (
@@ -183,6 +201,31 @@ const patchDictionaryEntry = async (
   `;
 };
 
+const deleteDictionaryEntry = async (
+  table: "subjects" | "levels" | "regions",
+  id: number
+) => {
+  if (table === "subjects") {
+    return sql`
+      DELETE FROM subjects
+      WHERE id = ${id}
+      RETURNING id
+    `;
+  }
+  if (table === "levels") {
+    return sql`
+      DELETE FROM levels
+      WHERE id = ${id}
+      RETURNING id
+    `;
+  }
+  return sql`
+    DELETE FROM regions
+    WHERE id = ${id}
+    RETURNING id
+  `;
+};
+
 const labelFor = (table: "subjects" | "levels" | "regions") => {
   if (table === "subjects") return "subject";
   if (table === "levels") return "level";
@@ -252,6 +295,36 @@ export const registerDictionaryRoutes = (app: Elysia) => {
           return fail(set, 409, "duplicate_code", `${label} code already exists.`);
         }
         return fail(set, 500, `${label}_update_failed`, `Failed to update ${label}.`);
+      }
+    });
+
+    app.delete(`/admin/dictionaries/${table}/:id`, async ({ headers, params, set }) => {
+      const admin = await ensureAdmin(headers.authorization, set);
+      if (!admin) {
+        return fail(set, set.status ?? 403, "forbidden", "Admin role required.");
+      }
+      const id = getInteger(params.id);
+      if (!id) {
+        return fail(set, 400, "validation_error", `Invalid ${label} id.`);
+      }
+
+      try {
+        const rows = await deleteDictionaryEntry(table, id);
+        const deleted = first<Record<string, unknown>>(rows);
+        if (!deleted) {
+          return fail(set, 404, "not_found", `${label} not found.`);
+        }
+        return { deleted: true, id, table };
+      } catch (error) {
+        if (dbErrorCode(error) === "23503") {
+          return fail(
+            set,
+            409,
+            `${label}_in_use`,
+            `${label} is referenced by other records and cannot be deleted.`
+          );
+        }
+        return fail(set, 500, `${label}_delete_failed`, `Failed to delete ${label}.`);
       }
     });
   }

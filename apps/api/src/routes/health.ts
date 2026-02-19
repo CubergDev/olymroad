@@ -1,6 +1,7 @@
 import type { Elysia } from "elysia";
 import { sql } from "../db";
 import { fail } from "../http";
+import { checkStorageHealth } from "../storage";
 
 export const registerHealthRoutes = (app: Elysia) => {
   app.get("/", () => ({
@@ -11,7 +12,26 @@ export const registerHealthRoutes = (app: Elysia) => {
   app.get("/health", async ({ set }) => {
     try {
       await sql`SELECT 1`;
-      return { status: "ok", database: "up" };
+      const storageHealth = await checkStorageHealth();
+      if (!storageHealth.ok) {
+        return fail(
+          set,
+          503,
+          "storage_unavailable",
+          "Object storage connection failed.",
+          {
+            bucket: storageHealth.bucket,
+            reason: storageHealth.reason ?? null,
+          }
+        );
+      }
+
+      return {
+        status: "ok",
+        database: "up",
+        storage: "up",
+        bucket: storageHealth.bucket,
+      };
     } catch {
       return fail(set, 500, "db_unavailable", "Database connection failed.");
     }

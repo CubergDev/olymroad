@@ -11,7 +11,7 @@ CREATE TYPE goal_period AS ENUM ('week', 'month');
 CREATE TYPE plan_status AS ENUM ('draft', 'active', 'completed', 'cancelled');
 CREATE TYPE entity_status AS ENUM ('draft', 'published', 'archived');
 CREATE TYPE file_purpose AS ENUM ('prep_material', 'export', 'avatar', 'attachment');
-CREATE TYPE file_provider AS ENUM ('minio', 's3');
+CREATE TYPE file_provider AS ENUM ('minio');
 
 CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
@@ -21,7 +21,7 @@ CREATE TABLE users (
     role user_role NOT NULL,
     school TEXT NULL,
     grade INT NULL,
-    locale TEXT NOT NULL DEFAULT 'ru' CHECK (locale IN ('ru', 'kz')),
+    locale TEXT NOT NULL DEFAULT 'ru' CHECK (locale IN ('en', 'ru', 'kz')),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -30,7 +30,7 @@ CREATE TABLE users (
 CREATE TABLE auth_accounts (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    provider TEXT NOT NULL CHECK (provider IN ('google', 'microsoft')),
+    provider TEXT NOT NULL CHECK (provider IN ('google')),
     provider_account_id TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (provider, provider_account_id)

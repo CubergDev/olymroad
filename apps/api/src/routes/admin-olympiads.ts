@@ -1,7 +1,7 @@
 import type { Elysia } from "elysia";
 import { requireRole, requireUser } from "../auth";
 import { first, sql } from "../db";
-import { fail } from "../http";
+import { fail, failForDbError } from "../http";
 import {
   getDateString,
   getInteger,
@@ -28,6 +28,64 @@ const ensureAdmin = async (
 };
 
 export const registerAdminOlympiadRoutes = (app: Elysia) => {
+  app.get("/admin/olympiads", async ({ headers, set }) => {
+    const user = await ensureAdmin(headers.authorization, set);
+    if (!user) {
+      return fail(set, set.status ?? 403, "forbidden", "Admin role required.");
+    }
+
+    try {
+      const rows = await sql`
+        SELECT
+          o.id,
+          o.title,
+          o.subject_id,
+          o.level_id,
+          o.region_id,
+          o.format,
+          o.organizer,
+          o.rules_url,
+          o.season,
+          o.status,
+          o.confirmed_by,
+          o.confirmed_at,
+          o.created_at,
+          o.updated_at,
+          sub.code AS subject_code,
+          sub.name_ru AS subject_name_ru,
+          sub.name_kz AS subject_name_kz,
+          lvl.code AS level_code,
+          lvl.name_ru AS level_name_ru,
+          lvl.name_kz AS level_name_kz,
+          reg.code AS region_code,
+          reg.name_ru AS region_name_ru,
+          reg.name_kz AS region_name_kz,
+          COUNT(s.id) AS stages_count
+        FROM olympiads o
+        INNER JOIN subjects sub ON sub.id = o.subject_id
+        INNER JOIN levels lvl ON lvl.id = o.level_id
+        LEFT JOIN regions reg ON reg.id = o.region_id
+        LEFT JOIN stages s ON s.olympiad_id = o.id
+        GROUP BY
+          o.id,
+          sub.code,
+          sub.name_ru,
+          sub.name_kz,
+          lvl.code,
+          lvl.name_ru,
+          lvl.name_kz,
+          reg.code,
+          reg.name_ru,
+          reg.name_kz
+        ORDER BY o.created_at DESC, o.id DESC
+      `;
+
+      return { items: rows };
+    } catch {
+      return fail(set, 500, "olympiads_fetch_failed", "Failed to fetch olympiads.");
+    }
+  });
+
   app.post("/admin/olympiads", async ({ headers, body, set }) => {
     const user = await ensureAdmin(headers.authorization, set);
     if (!user) {
@@ -79,8 +137,13 @@ export const registerAdminOlympiadRoutes = (app: Elysia) => {
         RETURNING *
       `;
       return { olympiad: first(rows) };
-    } catch {
-      return fail(set, 500, "olympiad_create_failed", "Failed to create olympiad.");
+    } catch (error) {
+      return failForDbError(
+        set,
+        error,
+        "olympiad_create_failed",
+        "Failed to create olympiad."
+      );
     }
   });
 
@@ -175,8 +238,13 @@ export const registerAdminOlympiadRoutes = (app: Elysia) => {
         return fail(set, 404, "not_found", "Olympiad not found.");
       }
       return { olympiad: updated };
-    } catch {
-      return fail(set, 500, "olympiad_update_failed", "Failed to update olympiad.");
+    } catch (error) {
+      return failForDbError(
+        set,
+        error,
+        "olympiad_update_failed",
+        "Failed to update olympiad."
+      );
     }
   });
 
@@ -203,8 +271,61 @@ export const registerAdminOlympiadRoutes = (app: Elysia) => {
         return fail(set, 404, "not_found", "Olympiad not found.");
       }
       return { olympiad: updated };
-    } catch {
-      return fail(set, 500, "olympiad_confirm_failed", "Failed to confirm olympiad.");
+    } catch (error) {
+      return failForDbError(
+        set,
+        error,
+        "olympiad_confirm_failed",
+        "Failed to confirm olympiad."
+      );
+    }
+  });
+
+  app.delete("/admin/olympiads/:id", async ({ headers, params, set }) => {
+    const user = await ensureAdmin(headers.authorization, set);
+    if (!user) {
+      return fail(set, set.status ?? 403, "forbidden", "Admin role required.");
+    }
+
+    const olympiadId = getInteger(params.id);
+    if (!olympiadId) {
+      return fail(set, 400, "validation_error", "Invalid olympiad id.");
+    }
+
+    try {
+      const stageRows = await sql`
+        SELECT COUNT(*)::int AS count
+        FROM stages
+        WHERE olympiad_id = ${olympiadId}
+      `;
+      const stageCount = Number(first<Record<string, unknown>>(stageRows)?.count ?? 0);
+      if (stageCount > 0) {
+        return fail(
+          set,
+          409,
+          "olympiad_has_stages",
+          "Delete stages linked to this olympiad first."
+        );
+      }
+
+      const rows = await sql`
+        DELETE FROM olympiads
+        WHERE id = ${olympiadId}
+        RETURNING id
+      `;
+      const deleted = first(rows);
+      if (!deleted) {
+        return fail(set, 404, "not_found", "Olympiad not found.");
+      }
+
+      return { deleted: true, olympiad_id: olympiadId };
+    } catch (error) {
+      return failForDbError(
+        set,
+        error,
+        "olympiad_delete_failed",
+        "Failed to delete olympiad."
+      );
     }
   });
 
@@ -239,6 +360,17 @@ export const registerAdminOlympiadRoutes = (app: Elysia) => {
     if (!isEntityStatus(statusRaw)) {
       return fail(set, 400, "validation_error", "Invalid stage status.");
     }
+    if (dateEnd && dateEnd < dateStart) {
+      return fail(set, 400, "validation_error", "date_end must be >= date_start.");
+    }
+    if (registrationDeadline > dateStart) {
+      return fail(
+        set,
+        400,
+        "validation_error",
+        "registration_deadline must be <= date_start."
+      );
+    }
 
     try {
       const rows = await sql`
@@ -259,8 +391,8 @@ export const registerAdminOlympiadRoutes = (app: Elysia) => {
         RETURNING *
       `;
       return { stage: first(rows) };
-    } catch {
-      return fail(set, 500, "stage_create_failed", "Failed to create stage.");
+    } catch (error) {
+      return failForDbError(set, error, "stage_create_failed", "Failed to create stage.");
     }
   });
 
@@ -323,6 +455,40 @@ export const registerAdminOlympiadRoutes = (app: Elysia) => {
       return fail(set, 400, "validation_error", "Invalid status.");
 
     try {
+      const currentRows = await sql`
+        SELECT id, date_start, date_end, registration_deadline
+        FROM stages
+        WHERE id = ${stageId}
+        LIMIT 1
+      `;
+      const currentStage = first<Record<string, unknown>>(currentRows);
+      if (!currentStage) {
+        return fail(set, 404, "not_found", "Stage not found.");
+      }
+
+      const currentDateStart = String(currentStage.date_start).slice(0, 10);
+      const currentDateEnd =
+        currentStage.date_end === null ? null : String(currentStage.date_end).slice(0, 10);
+      const currentRegistrationDeadline = String(currentStage.registration_deadline).slice(0, 10);
+
+      const nextDateStart = hasDateStart ? (dateStart as string) : currentDateStart;
+      const nextDateEnd = hasDateEnd ? dateEnd : currentDateEnd;
+      const nextRegistrationDeadline = hasRegistrationDeadline
+        ? (registrationDeadline as string)
+        : currentRegistrationDeadline;
+
+      if (nextDateEnd !== null && nextDateEnd < nextDateStart) {
+        return fail(set, 400, "validation_error", "date_end must be >= date_start.");
+      }
+      if (nextRegistrationDeadline > nextDateStart) {
+        return fail(
+          set,
+          400,
+          "validation_error",
+          "registration_deadline must be <= date_start."
+        );
+      }
+
       const rows = await sql`
         UPDATE stages
         SET
@@ -348,8 +514,8 @@ export const registerAdminOlympiadRoutes = (app: Elysia) => {
         return fail(set, 404, "not_found", "Stage not found.");
       }
       return { stage: updated };
-    } catch {
-      return fail(set, 500, "stage_update_failed", "Failed to update stage.");
+    } catch (error) {
+      return failForDbError(set, error, "stage_update_failed", "Failed to update stage.");
     }
   });
 
@@ -375,8 +541,34 @@ export const registerAdminOlympiadRoutes = (app: Elysia) => {
         return fail(set, 404, "not_found", "Stage not found.");
       }
       return { stage: updated };
-    } catch {
-      return fail(set, 500, "stage_confirm_failed", "Failed to confirm stage.");
+    } catch (error) {
+      return failForDbError(set, error, "stage_confirm_failed", "Failed to confirm stage.");
+    }
+  });
+
+  app.delete("/admin/stages/:id", async ({ headers, params, set }) => {
+    const user = await ensureAdmin(headers.authorization, set);
+    if (!user) {
+      return fail(set, set.status ?? 403, "forbidden", "Admin role required.");
+    }
+    const stageId = getInteger(params.id);
+    if (!stageId) {
+      return fail(set, 400, "validation_error", "Invalid stage id.");
+    }
+
+    try {
+      const rows = await sql`
+        DELETE FROM stages
+        WHERE id = ${stageId}
+        RETURNING id
+      `;
+      const deleted = first(rows);
+      if (!deleted) {
+        return fail(set, 404, "not_found", "Stage not found.");
+      }
+      return { deleted: true, stage_id: stageId };
+    } catch (error) {
+      return failForDbError(set, error, "stage_delete_failed", "Failed to delete stage.");
     }
   });
 };

@@ -1,7 +1,7 @@
 import type { Elysia } from "elysia";
 import { requireRole, requireUser } from "../auth";
 import { first, sql } from "../db";
-import { fail } from "../http";
+import { fail, failForDbError } from "../http";
 import {
   getDateString,
   getInteger,
@@ -12,6 +12,13 @@ import {
   isPrepType,
   isRecord,
 } from "../validation";
+
+const mapPrepTypeToLogType = (type: string): "theory" | "problems" | "mock" | "other" => {
+  if (type === "theory") return "theory";
+  if (type === "problems") return "problems";
+  if (type === "mock_exam") return "mock";
+  return "other";
+};
 
 export const registerPrepRoutes = (app: Elysia) => {
   app.post("/prep-activities", async ({ headers, body, set }) => {
@@ -39,6 +46,21 @@ export const registerPrepRoutes = (app: Elysia) => {
       body.material_object_id === undefined || body.material_object_id === null
         ? null
         : getUuidString(body.material_object_id);
+    const topicIdsRaw = body.topic_ids;
+
+    const topicIds: string[] = [];
+    if (topicIdsRaw !== undefined) {
+      if (!Array.isArray(topicIdsRaw)) {
+        return fail(set, 400, "validation_error", "topic_ids must be an array of topic ids.");
+      }
+      for (const topicIdRaw of topicIdsRaw) {
+        const topicId = getString(topicIdRaw);
+        if (!topicId) {
+          return fail(set, 400, "validation_error", "topic_ids must contain non-empty strings.");
+        }
+        topicIds.push(topicId);
+      }
+    }
 
     if (!date || !durationMinutes || !typeRaw || !isPrepType(typeRaw) || !topic) {
       return fail(set, 400, "validation_error", "Missing required prep activity fields.");
@@ -61,25 +83,138 @@ export const registerPrepRoutes = (app: Elysia) => {
     }
 
     try {
-      const rows = await sql`
-        INSERT INTO prep_activities (
-          student_id, stage_id, date, duration_minutes, type, topic, materials_url, material_object_id
-        )
-        VALUES (
-          ${user.id},
-          ${stageId},
-          ${date},
-          ${durationMinutes},
-          ${typeRaw},
-          ${topic},
-          ${materialsUrl ?? null},
-          ${materialObjectId}
-        )
-        RETURNING *
-      `;
-      return { activity: first(rows) };
-    } catch {
-      return fail(set, 500, "prep_activity_failed", "Failed to create prep activity.");
+      const result = await sql.begin(async (transaction) => {
+        let stageInstanceId: string | null = null;
+        if (stageId !== null) {
+          const stageRows = await transaction`
+            SELECT id, stage_instance_id
+            FROM stages
+            WHERE id = ${stageId}
+            LIMIT 1
+          `;
+          const stage = first<{ id: number; stage_instance_id: string | null }>(stageRows);
+          if (!stage) {
+            return { kind: "stage_not_found" as const };
+          }
+          stageInstanceId = stage.stage_instance_id;
+        }
+
+        if (materialObjectId !== null) {
+          const fileRows = await transaction`
+            SELECT id, owner_user_id, purpose, deleted_at
+            FROM file_objects
+            WHERE id = ${materialObjectId}
+            LIMIT 1
+          `;
+          const fileObject = first<Record<string, unknown>>(fileRows);
+          if (!fileObject) {
+            return { kind: "file_not_found" as const };
+          }
+
+          if ((fileObject.owner_user_id as number) !== user.id) {
+            return { kind: "file_not_owned" as const };
+          }
+          if (fileObject.deleted_at !== null) {
+            return { kind: "file_deleted" as const };
+          }
+          if (fileObject.purpose !== "prep_material") {
+            return { kind: "invalid_file_purpose" as const };
+          }
+        }
+
+        const rows = await transaction`
+          INSERT INTO prep_activities (
+            student_id, stage_id, date, duration_minutes, type, topic, materials_url, material_object_id
+          )
+          VALUES (
+            ${user.id},
+            ${stageId},
+            ${date},
+            ${durationMinutes},
+            ${typeRaw},
+            ${topic},
+            ${materialsUrl ?? null},
+            ${materialObjectId}
+          )
+          RETURNING *
+        `;
+
+        const createdActivity = first<Record<string, unknown>>(rows);
+
+        const prepLogRows = await transaction`
+          INSERT INTO prep_logs (
+            student_user_id,
+            happened_on,
+            minutes,
+            log_type,
+            note,
+            resource_url,
+            stage_instance_id
+          )
+          VALUES (
+            ${user.id},
+            ${date},
+            ${durationMinutes},
+            ${mapPrepTypeToLogType(typeRaw)},
+            ${topic},
+            ${materialsUrl ?? null},
+            ${stageInstanceId}
+          )
+          RETURNING id
+        `;
+        const prepLog = first<{ id: string }>(prepLogRows);
+
+        if (prepLog && topicIds.length > 0) {
+          for (const topicId of topicIds) {
+            await transaction`
+              INSERT INTO prep_log_topics (prep_log_id, topic_id)
+              VALUES (${prepLog.id}::uuid, ${topicId})
+              ON CONFLICT (prep_log_id, topic_id) DO NOTHING
+            `;
+          }
+        }
+
+        return {
+          kind: "ok" as const,
+          activity: createdActivity,
+          topic_ids: topicIds,
+        };
+      });
+
+      if (result.kind === "stage_not_found") {
+        return fail(set, 404, "stage_not_found", "Stage not found.");
+      }
+      if (result.kind === "file_not_found") {
+        return fail(set, 404, "file_not_found", "Prep material file not found.");
+      }
+      if (result.kind === "file_not_owned") {
+        return fail(
+          set,
+          403,
+          "file_access_denied",
+          "You can only attach files you uploaded yourself."
+        );
+      }
+      if (result.kind === "file_deleted") {
+        return fail(set, 409, "file_deleted", "Attached file is already deleted.");
+      }
+      if (result.kind === "invalid_file_purpose") {
+        return fail(
+          set,
+          409,
+          "invalid_file_purpose",
+          "Only files with purpose prep_material can be attached."
+        );
+      }
+
+      return { activity: result.activity, topic_ids: result.topic_ids ?? [] };
+    } catch (error) {
+      return failForDbError(
+        set,
+        error,
+        "prep_activity_failed",
+        "Failed to create prep activity."
+      );
     }
   });
 
@@ -108,8 +243,13 @@ export const registerPrepRoutes = (app: Elysia) => {
         ORDER BY date DESC, id DESC
       `;
       return { items: rows };
-    } catch {
-      return fail(set, 500, "prep_activities_failed", "Failed to fetch prep activities.");
+    } catch (error) {
+      return failForDbError(
+        set,
+        error,
+        "prep_activities_failed",
+        "Failed to fetch prep activities."
+      );
     }
   });
 
@@ -166,8 +306,8 @@ export const registerPrepRoutes = (app: Elysia) => {
         RETURNING *
       `;
       return { goal: first(rows) };
-    } catch {
-      return fail(set, 500, "prep_goal_failed", "Failed to upsert prep goal.");
+    } catch (error) {
+      return failForDbError(set, error, "prep_goal_failed", "Failed to upsert prep goal.");
     }
   });
 
@@ -194,8 +334,8 @@ export const registerPrepRoutes = (app: Elysia) => {
         ORDER BY period_start DESC
       `;
       return { items: rows };
-    } catch {
-      return fail(set, 500, "prep_goals_failed", "Failed to fetch prep goals.");
+    } catch (error) {
+      return failForDbError(set, error, "prep_goals_failed", "Failed to fetch prep goals.");
     }
   });
 };

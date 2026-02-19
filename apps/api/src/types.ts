@@ -1,4 +1,5 @@
 export type UserRole = "student" | "teacher" | "admin";
+export type AuthProvider = "google";
 export type OlympiadFormat = "online" | "offline" | "mixed";
 export type RegistrationStatus =
   | "planned"
@@ -10,6 +11,9 @@ export type ResultStatus = "participant" | "prize_winner" | "winner";
 export type GoalPeriod = "week" | "month";
 export type EntityStatus = "draft" | "published" | "archived";
 export type PlanStatus = "draft" | "active" | "completed" | "cancelled";
+export type FilePurpose = "prep_material" | "export" | "avatar" | "attachment";
+export type FileProvider = "minio";
+export type Locale = "en" | "ru" | "kz";
 
 export type PublicUser = {
   id: number;
@@ -18,7 +22,7 @@ export type PublicUser = {
   role: UserRole;
   school: string | null;
   grade: number | null;
-  locale: string;
+  locale: Locale;
   is_active: boolean;
   created_at: string;
   updated_at: string;

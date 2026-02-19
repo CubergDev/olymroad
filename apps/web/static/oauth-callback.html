@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+	</head>
+	<body>
+		<script>
+			(() => {
+				const messageType = 'olymroad:oauth-popup-result';
+				const storageKey = 'olymroad.oauth.popup.result';
+				const payload = {
+					type: messageType,
+					hash: window.location.hash || '',
+					search: window.location.search || '',
+					timestamp: Date.now()
+				};
+
+				try {
+					if (window.opener && !window.opener.closed) {
+						window.opener.postMessage(payload, window.location.origin);
+					}
+				} catch {
+				}
+
+				try {
+					localStorage.setItem(storageKey, JSON.stringify(payload));
+				} catch {
+				}
+
+				window.close();
+			})();
+		</script>
+	</body>
+</html>

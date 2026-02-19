@@ -25,10 +25,7 @@ This spec aligns to the actual repository layout:
 - Local infra includes **PostgreSQL + MinIO**.
 - DB schema must always match latest committed SQL migrations.
 - Use a **single unified root `.env`**.
-- Production target is **AWS**:
-1. API from `/apps/api` on public URL.
-2. PostgreSQL on AWS-managed service.
-3. Object storage on AWS S3.
+- Storage target for now is local **MinIO** only.
 - API provider is **OpenAI** with models:
 1. `gpt-5.2`
 2. `gpt-5-mini`
@@ -67,14 +64,14 @@ If any DB/storage conflict exists between files, `db_specs.md` wins.
 2. `name`, `email` (unique), `password_hash` (nullable for OAuth users)
 3. `role` (`user_role`)
 4. `school`, `grade` (nullable)
-5. `locale` (`ru`/`kz`, default `ru`)
+5. `locale` (`en`/`ru`/`kz`, default `ru`)
 6. `is_active` (boolean)
 7. `created_at`, `updated_at`
 
-- `auth_accounts` (for optional Google/Microsoft auth)
+- `auth_accounts` (for optional Google auth)
 1. `id` PK
 2. `user_id` FK -> `users`
-3. `provider` (`google`/`microsoft`)
+3. `provider` (`google`)
 4. `provider_account_id` (unique per provider)
 5. `created_at`
 
@@ -234,7 +231,6 @@ If any DB/storage conflict exists between files, `db_specs.md` wins.
 - `POST /auth/register`
 - `POST /auth/login`
 - `POST /auth/oauth/google` (optional)
-- `POST /auth/oauth/microsoft` (optional)
 - `PATCH /admin/users/:id/role` (admin role/access management)
 - `PATCH /admin/users/:id/active` (enable/disable access)
 
@@ -351,7 +347,7 @@ Optional:
 - UX: max **3 clicks** to register or view stage deadline.
 - Performance: dashboard open target **<= 2 seconds** on average laptop (p95).
 - Security: strict RBAC + ownership checks for user/group data.
-- Localization: minimum **RU + KZ** UI support.
+- Localization: minimum **EN + RU + KZ** UI support.
 - Accessibility/mobile: responsive UI required, mobile-first safe interactions.
 - Reliability: local infra and migration flow must run reproducibly from fresh clone.
 
@@ -375,7 +371,7 @@ Each phase must follow this rollout order:
 2. DB and MinIO connectivity checks.
 - Frontend:
 1. API base URL from `PUBLIC_API_URL`.
-2. RU/KZ i18n bootstrap.
+2. EN/RU/KZ i18n bootstrap.
 - Flow:
 1. No feature flags needed yet.
 
@@ -455,7 +451,7 @@ Each phase must follow this rollout order:
 1. Authorization audit by endpoint.
 2. Performance optimization for dashboard p95 target.
 - Frontend:
-1. RU/KZ completion.
+1. EN/RU/KZ completion.
 2. 3-click UX paths verified.
 3. Mobile QA for web and Capacitor wrappers.
 
@@ -468,7 +464,7 @@ Each phase must follow this rollout order:
 4. 4-8 week personalized plan generator.
 5. School/group ranking.
 6. AI study assistant (OpenAI-backed).
-7. Google/Microsoft OAuth production rollout.
+7. Google OAuth production rollout.
 
 ## 9) Demo Data and DoD
 

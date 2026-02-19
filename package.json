@@ -6,19 +6,27 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "bun run --parallel --filter @olymroad/api --filter @olymroad/web --if-present dev",
+    "dev": "concurrently --kill-others-on-fail --names api,web --prefix-colors cyan,magenta \"bun run dev:api\" \"bun run dev:web\"",
     "dev:api": "bun run --filter @olymroad/api dev",
-    "dev:web": "bun run --filter @olymroad/web dev",
+    "dev:web": "bun --env-file=.env run --filter @olymroad/web dev",
     "build": "bun run --filter @olymroad/api build && bun run --filter @olymroad/web build",
     "build:api": "bun run --filter @olymroad/api build",
-    "build:web": "bun run --filter @olymroad/web build",
-    "check:web": "bun run --filter @olymroad/web check",
+    "build:web": "bun --env-file=.env run --filter @olymroad/web build",
+    "check:web": "bun --env-file=.env run --filter @olymroad/web check",
     "mobile:sync": "bun run --filter @olymroad/web mobile:sync",
     "infra:up": "docker compose up -d --wait postgres minio && docker compose run --rm minio-init && docker compose run --rm migrate",
     "infra:down": "docker compose down",
     "infra:reset": "docker compose down -v --remove-orphans",
     "infra:logs": "docker compose logs -f postgres minio migrate minio-init",
     "db:migrate": "docker compose up -d --wait postgres && docker compose run --rm migrate",
-    "minio:init": "docker compose run --rm minio-init"
+    "minio:init": "docker compose run --rm minio-init",
+    "prod": "bun --env-file=.env ./scripts/prod.ts up",
+    "prod:down": "bun --env-file=.env ./scripts/prod.ts down",
+    "prod:status": "bun --env-file=.env ./scripts/prod.ts status",
+    "prod:logs": "bun --env-file=.env ./scripts/prod.ts logs"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "pm2": "^5.4.3"
   }
 }

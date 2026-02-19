@@ -41,6 +41,36 @@ This starts:
 bun run dev
 ```
 
+## PM2 Prod Flow
+
+Use the root `.env` as the only env file (for both app and compose). For your teammate setup, set:
+
+- `PUBLIC_API_URL=https://olymroad-api.depa-team.com`
+- `CORS_ORIGINS=https://olymroad.depa-team.com`
+- `WEBAUTHN_RP_ID=olymroad.depa-team.com`
+- `WEBAUTHN_ORIGINS=https://olymroad.depa-team.com`
+- `PORT=8274`
+- `WEB_PORT=5123`
+
+Then run one command:
+
+```bash
+bun run prod
+```
+
+`prod` does all required steps in one run:
+
+- starts compose infra (`postgres`, `minio`) using `.env`
+- runs `minio-init` + `migrate`
+- builds API + web
+- runs `pm2 startOrReload`
+
+Useful prod commands:
+
+- `bun run prod:status`
+- `bun run prod:logs`
+- `bun run prod:down`
+
 ## Infra Commands
 
 - `bun run infra:up` start/update local infra
@@ -49,6 +79,10 @@ bun run dev
 - `bun run infra:logs` follow infra logs
 - `bun run db:migrate` run DB migrations manually
 - `bun run minio:init` re-run MinIO bucket init
+
+## Storage
+
+- Storage uses local MinIO with `MINIO_*` env keys from root `.env`.
 
 ## Database Migrations
 

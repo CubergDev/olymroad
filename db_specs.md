@@ -19,9 +19,8 @@ If any conflict exists between this file and other specs, this file wins for DB 
 ## 2) Systems and Versions
 
 1. Relational DB: PostgreSQL 17 (`postgres:17-alpine` image family).
-2. Object storage (dev): MinIO (`minio/minio` + `minio/mc`).
-3. Object storage (prod): AWS S3 (MinIO-compatible contract where applicable).
-4. API runtime touching DB/storage: `apps/api` (ElysiaJS + Bun).
+2. Object storage: MinIO (`minio/minio` + `minio/mc`).
+3. API runtime touching DB/storage: `apps/api` (ElysiaJS + Bun).
 
 ## 3) Environment Contract (Root `.env`)
 
@@ -35,20 +34,21 @@ Required keys:
 4. `POSTGRES_PORT`
 5. `DATABASE_URL`
 6. `DATABASE_URL_DOCKER`
-7. `MINIO_ROOT_USER`
-8. `MINIO_ROOT_PASSWORD`
-9. `MINIO_BUCKET`
-10. `MINIO_PORT`
-11. `MINIO_CONSOLE_PORT`
-12. `MINIO_ENDPOINT`
-13. `MINIO_ACCESS_KEY`
-14. `MINIO_SECRET_KEY`
+7. `STORAGE_PRESIGN_TTL_SECONDS`
+8. `MINIO_ROOT_USER`
+9. `MINIO_ROOT_PASSWORD`
+10. `MINIO_BUCKET`
+11. `MINIO_PORT`
+12. `MINIO_CONSOLE_PORT`
+13. `MINIO_ENDPOINT`
+14. `MINIO_ACCESS_KEY`
+15. `MINIO_SECRET_KEY`
 
 Rules:
 
 1. `DATABASE_URL` is host-facing (`localhost`) for local tools.
 2. `DATABASE_URL_DOCKER` is container-facing (`postgres`) for compose jobs.
-3. Secrets are never committed.
+4. Secrets are never committed.
 
 ## 4) Local Dev Setup (Docker Compose)
 
@@ -103,7 +103,7 @@ Baseline migration must enable:
 8. `plan_status`: `draft`, `active`, `completed`, `cancelled`
 9. `entity_status`: `draft`, `published`, `archived`
 10. `file_purpose`: `prep_material`, `export`, `avatar`, `attachment`
-11. `file_provider`: `minio`, `s3`
+11. `file_provider`: `minio`
 
 ## 5.4 Core Tables (Required)
 
@@ -116,7 +116,7 @@ Baseline migration must enable:
 5. `role user_role not null`
 6. `school text null`
 7. `grade int null`
-8. `locale text not null default 'ru' check (locale in ('ru','kz'))`
+8. `locale text not null default 'ru' check (locale in ('en','ru','kz'))`
 9. `is_active boolean not null default true`
 10. `created_at timestamptz not null default now()`
 11. `updated_at timestamptz not null default now()`
@@ -125,7 +125,7 @@ Baseline migration must enable:
 
 1. `id bigserial primary key`
 2. `user_id bigint not null references users(id) on delete cascade`
-3. `provider text not null check (provider in ('google','microsoft'))`
+3. `provider text not null check (provider in ('google'))`
 4. `provider_account_id text not null`
 5. `created_at timestamptz not null default now()`
 6. `unique(provider, provider_account_id)`
@@ -308,12 +308,12 @@ Baseline migration must enable:
 6. `is_read boolean not null default false`
 7. `created_at timestamptz not null default now()`
 
-## 5.5 Storage Metadata Tables (Required for MinIO/S3 Data Flow)
+## 5.5 Storage Metadata Tables (Required for MinIO Data Flow)
 
 `file_objects`
 
 1. `id uuid primary key default gen_random_uuid()`
-2. `provider file_provider not null` (`minio` in dev, `s3` in prod)
+2. `provider file_provider not null` (`minio`)
 3. `bucket text not null`
 4. `object_key text not null`
 5. `purpose file_purpose not null`
@@ -353,14 +353,13 @@ Create indexes:
 9. `notifications(user_id, is_read, created_at desc)`
 10. `file_objects(owner_user_id, purpose, created_at desc)`
 
-## 6) MinIO/S3 Contract
+## 6) MinIO Contract
 
 ## 6.1 Bucket Rules
 
 1. Dev bucket name from `MINIO_BUCKET` (default `olymroad-dev`).
-2. Prod bucket example: `olymroad-prod`.
-3. Buckets are private by default.
-4. API issues pre-signed URLs for upload/download.
+2. Buckets are private by default.
+3. API issues pre-signed URLs for upload/download.
 
 ## 6.2 Object Key Prefix Rules
 
@@ -428,7 +427,7 @@ Invalid transitions must return domain error.
 
 1. Client requests upload intent from API (`purpose=prep_material`).
 2. API creates `file_objects` row and returns pre-signed upload URL.
-3. Client uploads directly to MinIO/S3.
+3. Client uploads directly to MinIO.
 4. Client submits prep activity with `material_object_id`.
 5. API verifies file ownership and links it in `prep_activities`.
 
@@ -518,7 +517,7 @@ Rules:
 
 1. API must not use superuser credentials.
 2. Secrets rotate per environment.
-3. MinIO/S3 keys are server-side only.
+3. MinIO keys are server-side only.
 4. Clients never receive raw root keys.
 
 ## 11) Reliability and Operations

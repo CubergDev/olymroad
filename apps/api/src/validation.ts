@@ -1,6 +1,8 @@
 import type {
   EntityStatus,
+  FilePurpose,
   GoalPeriod,
+  Locale,
   OlympiadFormat,
   PlanStatus,
   PrepType,
@@ -12,6 +14,11 @@ import type {
 
 export const isUserRole = (value: string): value is UserRole =>
   value === "student" || value === "teacher" || value === "admin";
+
+export const SUPPORTED_LOCALES = ["en", "ru", "kz"] as const;
+
+export const isLocale = (value: string): value is Locale =>
+  value === "en" || value === "ru" || value === "kz";
 
 export const isOlympiadFormat = (value: string): value is OlympiadFormat =>
   value === "online" || value === "offline" || value === "mixed";
@@ -39,6 +46,12 @@ export const isPlanStatus = (value: string): value is PlanStatus =>
   value === "active" ||
   value === "completed" ||
   value === "cancelled";
+
+export const isFilePurpose = (value: string): value is FilePurpose =>
+  value === "prep_material" ||
+  value === "export" ||
+  value === "avatar" ||
+  value === "attachment";
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);

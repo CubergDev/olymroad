@@ -180,7 +180,6 @@ Validation done:
 ### Optional Functions (specs.md sections 5.1/5.8/5.11)
 
 - [ ] `POST /auth/oauth/google`
-- [ ] `POST /auth/oauth/microsoft`
 - [ ] `GET /teacher/groups/:group_id/export?format=pdf|xlsx`
 - [ ] `GET /calendar/ics`
 - [ ] `POST /integrations/google-calendar/connect`
