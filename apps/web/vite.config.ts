@@ -9,5 +9,8 @@ export default defineConfig({
 		tailwindcss(),
 		sveltekit(),
 		paraglideVitePlugin({ project: './project.inlang', outdir: './src/lib/paraglide' })
-	]
+	],
+	preview: {
+		allowedHosts: ['olymroad.depa-team.com']
+	}
 });

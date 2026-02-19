@@ -81,7 +81,10 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
     const deadlineSoon = query.deadline_soon === "true";
     const limitRaw = query.limit === undefined ? null : getInteger(query.limit);
 
-    if ((query.from !== undefined && !fromDate) || (query.to !== undefined && !toDate)) {
+    if (
+      (query.from !== undefined && !fromDate) ||
+      (query.to !== undefined && !toDate)
+    ) {
       return fail(set, 400, "validation_error", "from/to must be YYYY-MM-DD.");
     }
     if (eventType !== null && !EVENT_TYPES.has(eventType)) {
@@ -89,7 +92,7 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
         set,
         400,
         "validation_error",
-        "event_type must be olympiad/research_projects/contest_game/hackathon/camp/other."
+        "event_type must be olympiad/research_projects/contest_game/hackathon/camp/other.",
       );
     }
     if (stageType !== null && !STAGE_TYPES.has(stageType)) {
@@ -97,11 +100,16 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
         set,
         400,
         "validation_error",
-        "stage_type must be selection/regional/final/submission/defense/training."
+        "stage_type must be selection/regional/final/submission/defense/training.",
       );
     }
     if (query.limit !== undefined && (limitRaw === null || limitRaw < 1)) {
-      return fail(set, 400, "validation_error", "limit must be a positive integer.");
+      return fail(
+        set,
+        400,
+        "validation_error",
+        "limit must be a positive integer.",
+      );
     }
 
     const limit = limitRaw ? Math.min(limitRaw, 500) : 250;
@@ -196,7 +204,12 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
         items: rows,
       };
     } catch (error) {
-      return failForDbError(set, error, "v2_roadmap_failed", "Failed to fetch v2 roadmap.");
+      return failForDbError(
+        set,
+        error,
+        "v2_roadmap_failed",
+        "Failed to fetch v2 roadmap.",
+      );
     }
   });
 
@@ -331,7 +344,9 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
         `) as Array<Record<string, unknown>>;
       }
 
-      const frameworkIds = frameworkRows.map((row) => String((row as Record<string, unknown>).id));
+      const frameworkIds = frameworkRows.map((row) =>
+        String((row as Record<string, unknown>).id),
+      );
       const topicRows =
         frameworkIds.length === 0
           ? []
@@ -360,81 +375,108 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
         set,
         error,
         "v2_stage_instance_fetch_failed",
-        "Failed to fetch stage instance details."
+        "Failed to fetch stage instance details.",
       );
     }
   });
 
-  app.post("/v2/stage-instances/:id/plan", async ({ headers, params, body, set }) => {
-    const user = await requireUser(headers.authorization, set);
-    if (!user) {
-      return fail(set, 401, "unauthorized", "Unauthorized.");
-    }
-    if (!requireRole(user, ["student"], set)) {
-      return fail(set, 403, "forbidden", "Only students can update plan status.");
-    }
-
-    const stageInstanceId = getUuidString(params.id);
-    if (!stageInstanceId) {
-      return fail(set, 400, "validation_error", "Invalid stage instance id.");
-    }
-    if (!isRecord(body)) {
-      return fail(set, 400, "validation_error", "Invalid request body.");
-    }
-
-    const statusRawInput = getString(body.status);
-    if (body.status !== undefined && !statusRawInput) {
-      return fail(set, 400, "validation_error", "status must be a non-empty string.");
-    }
-    const statusRaw = statusRawInput ?? "PLANNED";
-    if (!isPlanStatus(statusRaw)) {
-      return fail(
-        set,
-        400,
-        "validation_error",
-        "status must be PLANNED/REGISTERED/PARTICIPATED/RESULT_ENTERED/MISSED/CANCELLED."
-      );
-    }
-
-    const externalRegistrationUrl = getNullableString(body.external_registration_url);
-    if (body.external_registration_url !== undefined && externalRegistrationUrl === undefined) {
-      return fail(
-        set,
-        400,
-        "validation_error",
-        "external_registration_url must be string or null."
-      );
-    }
-
-    const notes = getNullableString(body.notes);
-    if (body.notes !== undefined && notes === undefined) {
-      return fail(set, 400, "validation_error", "notes must be string or null.");
-    }
-
-    let checklistState: Record<string, unknown> = {};
-    if (body.checklist_state !== undefined) {
-      if (body.checklist_state === null) {
-        checklistState = {};
-      } else if (!isRecord(body.checklist_state)) {
-        return fail(set, 400, "validation_error", "checklist_state must be object or null.");
-      } else {
-        checklistState = body.checklist_state;
+  app.post(
+    "/v2/stage-instances/:id/plan",
+    async ({ headers, params, body, set }) => {
+      const user = await requireUser(headers.authorization, set);
+      if (!user) {
+        return fail(set, 401, "unauthorized", "Unauthorized.");
       }
-    }
+      if (!requireRole(user, ["student"], set)) {
+        return fail(
+          set,
+          403,
+          "forbidden",
+          "Only students can update plan status.",
+        );
+      }
 
-    try {
-      const result = await sql.begin(async (transaction) => {
-        const stageRows = await transaction`
+      const stageInstanceId = getUuidString(params.id);
+      if (!stageInstanceId) {
+        return fail(set, 400, "validation_error", "Invalid stage instance id.");
+      }
+      if (!isRecord(body)) {
+        return fail(set, 400, "validation_error", "Invalid request body.");
+      }
+
+      const statusRawInput = getString(body.status);
+      if (body.status !== undefined && !statusRawInput) {
+        return fail(
+          set,
+          400,
+          "validation_error",
+          "status must be a non-empty string.",
+        );
+      }
+      const statusRaw = statusRawInput ?? "PLANNED";
+      if (!isPlanStatus(statusRaw)) {
+        return fail(
+          set,
+          400,
+          "validation_error",
+          "status must be PLANNED/REGISTERED/PARTICIPATED/RESULT_ENTERED/MISSED/CANCELLED.",
+        );
+      }
+
+      const externalRegistrationUrl = getNullableString(
+        body.external_registration_url,
+      );
+      if (
+        body.external_registration_url !== undefined &&
+        externalRegistrationUrl === undefined
+      ) {
+        return fail(
+          set,
+          400,
+          "validation_error",
+          "external_registration_url must be string or null.",
+        );
+      }
+
+      const notes = getNullableString(body.notes);
+      if (body.notes !== undefined && notes === undefined) {
+        return fail(
+          set,
+          400,
+          "validation_error",
+          "notes must be string or null.",
+        );
+      }
+
+      let checklistState: Record<string, unknown> = {};
+      if (body.checklist_state !== undefined) {
+        if (body.checklist_state === null) {
+          checklistState = {};
+        } else if (!isRecord(body.checklist_state)) {
+          return fail(
+            set,
+            400,
+            "validation_error",
+            "checklist_state must be object or null.",
+          );
+        } else {
+          checklistState = body.checklist_state;
+        }
+      }
+
+      try {
+        const result = await sql.begin(async (transaction) => {
+          const stageRows = await transaction`
           SELECT id
           FROM stage_instances
           WHERE id = ${stageInstanceId}::uuid
           LIMIT 1
         `;
-        if (!first(stageRows)) {
-          return { kind: "stage_not_found" as const };
-        }
+          if (!first(stageRows)) {
+            return { kind: "stage_not_found" as const };
+          }
 
-        const planRows = await transaction`
+          const planRows = await transaction`
           INSERT INTO student_stage_plans (
             student_user_id,
             stage_instance_id,
@@ -473,80 +515,101 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
           RETURNING *
         `;
 
-        return {
-          kind: "ok" as const,
-          plan: first(planRows),
-        };
-      });
+          return {
+            kind: "ok" as const,
+            plan: first(planRows),
+          };
+        });
 
-      if (result.kind === "stage_not_found") {
-        return fail(set, 404, "not_found", "Stage instance not found.");
+        if (result.kind === "stage_not_found") {
+          return fail(set, 404, "not_found", "Stage instance not found.");
+        }
+
+        return { plan: result.plan };
+      } catch (error) {
+        return failForDbError(
+          set,
+          error,
+          "v2_stage_plan_failed",
+          "Failed to upsert stage plan status.",
+        );
+      }
+    },
+  );
+
+  app.post(
+    "/v2/stage-instances/:id/results",
+    async ({ headers, params, body, set }) => {
+      const user = await requireUser(headers.authorization, set);
+      if (!user) {
+        return fail(set, 401, "unauthorized", "Unauthorized.");
+      }
+      if (!requireRole(user, ["student"], set)) {
+        return fail(set, 403, "forbidden", "Only students can submit results.");
       }
 
-      return { plan: result.plan };
-    } catch (error) {
-      return failForDbError(
-        set,
-        error,
-        "v2_stage_plan_failed",
-        "Failed to upsert stage plan status."
-      );
-    }
-  });
+      const stageInstanceId = getUuidString(params.id);
+      if (!stageInstanceId) {
+        return fail(set, 400, "validation_error", "Invalid stage instance id.");
+      }
+      if (!isRecord(body)) {
+        return fail(set, 400, "validation_error", "Invalid request body.");
+      }
 
-  app.post("/v2/stage-instances/:id/results", async ({ headers, params, body, set }) => {
-    const user = await requireUser(headers.authorization, set);
-    if (!user) {
-      return fail(set, 401, "unauthorized", "Unauthorized.");
-    }
-    if (!requireRole(user, ["student"], set)) {
-      return fail(set, 403, "forbidden", "Only students can submit results.");
-    }
+      const resultStatusRaw = getString(body.result_status);
+      const score =
+        body.score === undefined || body.score === null
+          ? null
+          : getNumber(body.score);
+      const placeText = getNullableString(body.place_text);
+      const comment = getNullableString(body.comment);
 
-    const stageInstanceId = getUuidString(params.id);
-    if (!stageInstanceId) {
-      return fail(set, 400, "validation_error", "Invalid stage instance id.");
-    }
-    if (!isRecord(body)) {
-      return fail(set, 400, "validation_error", "Invalid request body.");
-    }
+      if (!resultStatusRaw || !isResultStatus(resultStatusRaw)) {
+        return fail(
+          set,
+          400,
+          "validation_error",
+          "result_status must be participant/prize_winner/winner.",
+        );
+      }
+      if (body.score !== undefined && body.score !== null && score === null) {
+        return fail(
+          set,
+          400,
+          "validation_error",
+          "score must be numeric or null.",
+        );
+      }
+      if (body.place_text !== undefined && placeText === undefined) {
+        return fail(
+          set,
+          400,
+          "validation_error",
+          "place_text must be string or null.",
+        );
+      }
+      if (body.comment !== undefined && comment === undefined) {
+        return fail(
+          set,
+          400,
+          "validation_error",
+          "comment must be string or null.",
+        );
+      }
 
-    const resultStatusRaw = getString(body.result_status);
-    const score = body.score === undefined || body.score === null ? null : getNumber(body.score);
-    const placeText = getNullableString(body.place_text);
-    const comment = getNullableString(body.comment);
-
-    if (!resultStatusRaw || !isResultStatus(resultStatusRaw)) {
-      return fail(
-        set,
-        400,
-        "validation_error",
-        "result_status must be participant/prize_winner/winner."
-      );
-    }
-    if (body.score !== undefined && body.score !== null && score === null) {
-      return fail(set, 400, "validation_error", "score must be numeric or null.");
-    }
-    if (body.place_text !== undefined && placeText === undefined) {
-      return fail(set, 400, "validation_error", "place_text must be string or null.");
-    }
-    if (body.comment !== undefined && comment === undefined) {
-      return fail(set, 400, "validation_error", "comment must be string or null.");
-    }
-
-    try {
-      const result = await sql.begin(async (transaction) => {
-        const stageRows = await transaction`
+      try {
+        const result = await sql.begin(async (transaction) => {
+          const stageRows = await transaction`
           SELECT id
           FROM stage_instances
           WHERE id = ${stageInstanceId}::uuid
           LIMIT 1
         `;
-        if (!first(stageRows)) {
-          return { kind: "stage_not_found" as const };
-        }
+          if (!first(stageRows)) {
+            return { kind: "stage_not_found" as const };
+          }
 
-        const resultRows = await transaction`
+          const resultRows = await transaction`
           INSERT INTO stage_results (
             student_user_id,
             stage_instance_id,
@@ -572,7 +635,7 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
           RETURNING *
         `;
 
-        const planRows = await transaction`
+          const planRows = await transaction`
           INSERT INTO student_stage_plans (
             student_user_id,
             stage_instance_id,
@@ -594,27 +657,28 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
           RETURNING *
         `;
 
-        return {
-          kind: "ok" as const,
-          result: first(resultRows),
-          plan: first(planRows),
-        };
-      });
+          return {
+            kind: "ok" as const,
+            result: first(resultRows),
+            plan: first(planRows),
+          };
+        });
 
-      if (result.kind === "stage_not_found") {
-        return fail(set, 404, "not_found", "Stage instance not found.");
+        if (result.kind === "stage_not_found") {
+          return fail(set, 404, "not_found", "Stage instance not found.");
+        }
+
+        return { result: result.result, plan: result.plan };
+      } catch (error) {
+        return failForDbError(
+          set,
+          error,
+          "v2_stage_result_failed",
+          "Failed to upsert stage result.",
+        );
       }
-
-      return { result: result.result, plan: result.plan };
-    } catch (error) {
-      return failForDbError(
-        set,
-        error,
-        "v2_stage_result_failed",
-        "Failed to upsert stage result."
-      );
-    }
-  });
+    },
+  );
 
   app.get("/v2/prep/topics", async ({ headers, query, set }) => {
     const user = await requireUser(headers.authorization, set);
@@ -631,7 +695,12 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
     const limitRaw = query.limit === undefined ? null : getInteger(query.limit);
 
     if (query.limit !== undefined && (limitRaw === null || limitRaw < 1)) {
-      return fail(set, 400, "validation_error", "limit must be a positive integer.");
+      return fail(
+        set,
+        400,
+        "validation_error",
+        "limit must be a positive integer.",
+      );
     }
 
     const limit = limitRaw ? Math.min(limitRaw, 500) : 300;
@@ -696,7 +765,9 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
         }
       }
 
-      const frameworkIds = frameworks.map((row) => String((row as Record<string, unknown>).id));
+      const frameworkIds = frameworks.map((row) =>
+        String((row as Record<string, unknown>).id),
+      );
       const topics =
         frameworkIds.length === 0
           ? []
@@ -751,7 +822,7 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
         `) as Array<Record<string, unknown>>;
 
         const fallbackFrameworkIds = fallbackFrameworks.map((row) =>
-          String((row as Record<string, unknown>).id)
+          String((row as Record<string, unknown>).id),
         );
         const fallbackTopics =
           fallbackFrameworkIds.length === 0
@@ -785,7 +856,7 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
           set,
           fallbackError,
           "v2_prep_topics_failed",
-          "Failed to fetch prep topic catalog."
+          "Failed to fetch prep topic catalog.",
         );
       }
     }
@@ -804,11 +875,19 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
     const toDate = query.to ? getDateString(query.to) : null;
     const limitRaw = query.limit === undefined ? null : getInteger(query.limit);
 
-    if ((query.from !== undefined && !fromDate) || (query.to !== undefined && !toDate)) {
+    if (
+      (query.from !== undefined && !fromDate) ||
+      (query.to !== undefined && !toDate)
+    ) {
       return fail(set, 400, "validation_error", "from/to must be YYYY-MM-DD.");
     }
     if (query.limit !== undefined && (limitRaw === null || limitRaw < 1)) {
-      return fail(set, 400, "validation_error", "limit must be a positive integer.");
+      return fail(
+        set,
+        400,
+        "validation_error",
+        "limit must be a positive integer.",
+      );
     }
 
     const limit = limitRaw ? Math.min(limitRaw, 500) : 200;
@@ -859,7 +938,12 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
         items: rows,
       };
     } catch (error) {
-      return failForDbError(set, error, "v2_prep_logs_failed", "Failed to fetch prep logs.");
+      return failForDbError(
+        set,
+        error,
+        "v2_prep_logs_failed",
+        "Failed to fetch prep logs.",
+      );
     }
   });
 
@@ -875,12 +959,22 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
       return fail(set, 400, "validation_error", "Invalid request body.");
     }
 
-    const happenedOn = getDateString(body.happened_on ?? body.date);
-    const minutes = getInteger(body.minutes ?? body.duration_minutes);
-    const logTypeRaw = getString(body.log_type ?? body.type);
+    const happenedOn = getDateString(
+      body.happened_on !== undefined ? body.happened_on : body.date,
+    );
+    const minutes = getInteger(
+      body.minutes !== undefined ? body.minutes : body.duration_minutes,
+    );
+    const logTypeRaw = getString(
+      body.log_type !== undefined ? body.log_type : body.type,
+    );
     const logType = logTypeRaw ? toPrepLogType(logTypeRaw) : null;
-    const note = getNullableString(body.note ?? body.topic);
-    const resourceUrl = getNullableString(body.resource_url ?? body.materials_url);
+    const note = getNullableString(
+      body.note !== undefined ? body.note : body.topic,
+    );
+    const resourceUrl = getNullableString(
+      body.resource_url !== undefined ? body.resource_url : body.materials_url,
+    );
     const stageInstanceId =
       body.stage_instance_id === undefined || body.stage_instance_id === null
         ? null
@@ -891,7 +985,7 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
         set,
         400,
         "validation_error",
-        "happened_on, minutes, and log_type are required."
+        "happened_on, minutes, and log_type are required.",
       );
     }
     if (
@@ -899,25 +993,45 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
       body.stage_instance_id !== null &&
       !stageInstanceId
     ) {
-      return fail(set, 400, "validation_error", "stage_instance_id must be UUID or null.");
+      return fail(
+        set,
+        400,
+        "validation_error",
+        "stage_instance_id must be UUID or null.",
+      );
     }
     if (body.note !== undefined && note === undefined) {
       return fail(set, 400, "validation_error", "note must be string or null.");
     }
     if (body.resource_url !== undefined && resourceUrl === undefined) {
-      return fail(set, 400, "validation_error", "resource_url must be string or null.");
+      return fail(
+        set,
+        400,
+        "validation_error",
+        "resource_url must be string or null.",
+      );
     }
 
     const topicIdsRaw = body.topic_ids;
     const topicIds: string[] = [];
     if (topicIdsRaw !== undefined) {
       if (!Array.isArray(topicIdsRaw)) {
-        return fail(set, 400, "validation_error", "topic_ids must be an array of strings.");
+        return fail(
+          set,
+          400,
+          "validation_error",
+          "topic_ids must be an array of strings.",
+        );
       }
       for (const topicIdRaw of topicIdsRaw) {
         const topicId = getString(topicIdRaw);
         if (!topicId) {
-          return fail(set, 400, "validation_error", "topic_ids must contain non-empty strings.");
+          return fail(
+            set,
+            400,
+            "validation_error",
+            "topic_ids must contain non-empty strings.",
+          );
         }
         topicIds.push(topicId);
       }
@@ -945,7 +1059,7 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
             WHERE id = ANY(${uniqueTopicIds}::text[])
           `;
           const foundTopicIds = new Set(
-            topicRows.map((row) => String((row as Record<string, unknown>).id))
+            topicRows.map((row) => String((row as Record<string, unknown>).id)),
           );
           if (foundTopicIds.size !== uniqueTopicIds.length) {
             return { kind: "topic_not_found" as const };
@@ -996,7 +1110,12 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
         return fail(set, 404, "not_found", "Stage instance not found.");
       }
       if (result.kind === "topic_not_found") {
-        return fail(set, 404, "not_found", "One or more topics were not found.");
+        return fail(
+          set,
+          404,
+          "not_found",
+          "One or more topics were not found.",
+        );
       }
 
       return {
@@ -1004,7 +1123,12 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
         topic_ids: result.topic_ids,
       };
     } catch (error) {
-      return failForDbError(set, error, "v2_prep_log_create_failed", "Failed to create prep log.");
+      return failForDbError(
+        set,
+        error,
+        "v2_prep_log_create_failed",
+        "Failed to create prep log.",
+      );
     }
   });
 
@@ -1014,12 +1138,22 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
       return fail(set, 401, "unauthorized", "Unauthorized.");
     }
     if (!requireRole(user, ["student"], set)) {
-      return fail(set, 403, "forbidden", "Only students can view prep analytics.");
+      return fail(
+        set,
+        403,
+        "forbidden",
+        "Only students can view prep analytics.",
+      );
     }
 
     const daysRaw = query.days === undefined ? null : getInteger(query.days);
     if (query.days !== undefined && (daysRaw === null || daysRaw < 1)) {
-      return fail(set, 400, "validation_error", "days must be a positive integer.");
+      return fail(
+        set,
+        400,
+        "validation_error",
+        "days must be a positive integer.",
+      );
     }
 
     const days = daysRaw ? Math.min(daysRaw, 365) : 60;
@@ -1028,7 +1162,13 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
       .slice(0, 10);
 
     try {
-      const [summaryRows, byTypeRows, byDayRows, stageProgressRows, resultRows] = await Promise.all([
+      const [
+        summaryRows,
+        byTypeRows,
+        byDayRows,
+        stageProgressRows,
+        resultRows,
+      ] = await Promise.all([
         sql`
           SELECT
             COUNT(*)::int AS sessions,
@@ -1103,7 +1243,7 @@ export const registerV2OlympiadPrepRoutes = (app: Elysia) => {
         set,
         error,
         "v2_prep_analytics_failed",
-        "Failed to fetch prep analytics."
+        "Failed to fetch prep analytics.",
       );
     }
   });

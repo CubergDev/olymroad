@@ -62,7 +62,11 @@ type AiRecommendations = {
 };
 
 const normalizeText = (value: string): string =>
-  value.toLowerCase().replace(/\s+/g, " ").replace(/[^\p{L}\p{N}\s-]+/gu, "").trim();
+  value
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[^\p{L}\p{N}\s-]+/gu, "")
+    .trim();
 
 const toIsoDate = (value: unknown): string | null => {
   if (value === null || value === undefined) {
@@ -217,7 +221,11 @@ const extractResponseOutputText = (payload: unknown): string | null => {
   }
 
   for (const outputItem of payload.output) {
-    if (!isRecord(outputItem) || outputItem.type !== "message" || !Array.isArray(outputItem.content)) {
+    if (
+      !isRecord(outputItem) ||
+      outputItem.type !== "message" ||
+      !Array.isArray(outputItem.content)
+    ) {
       continue;
     }
     for (const contentItem of outputItem.content) {
@@ -234,7 +242,9 @@ const extractResponseOutputText = (payload: unknown): string | null => {
   return null;
 };
 
-const mapAiRecommendations = (payload: unknown): Omit<AiRecommendations, "model" | "prompt_used"> | null => {
+const mapAiRecommendations = (
+  payload: unknown,
+): Omit<AiRecommendations, "model" | "prompt_used"> | null => {
   if (!isRecord(payload)) {
     return null;
   }
@@ -278,8 +288,11 @@ const mapAiRecommendations = (payload: unknown): Omit<AiRecommendations, "model"
 };
 
 const resolveSubjectLabel = (
-  row: Pick<DbRecommendationRow, "subject_code" | "subject_name_ru" | "subject_name_kz">,
-  locale: string
+  row: Pick<
+    DbRecommendationRow,
+    "subject_code" | "subject_name_ru" | "subject_name_kz"
+  >,
+  locale: string,
 ): string => {
   if (locale === "kz") {
     return row.subject_name_kz || row.subject_name_ru || row.subject_code;
@@ -292,7 +305,7 @@ const resolveSubjectLabel = (
 
 const resolveLevelLabel = (
   row: Pick<DbRecommendationRow, "level_name_ru" | "level_name_kz">,
-  locale: string
+  locale: string,
 ): string => {
   if (locale === "kz") {
     return row.level_name_kz || row.level_name_ru;
@@ -300,7 +313,10 @@ const resolveLevelLabel = (
   return row.level_name_ru;
 };
 
-const findMatchingSubjectIds = (directions: string[], subjects: SubjectRow[]): number[] => {
+const findMatchingSubjectIds = (
+  directions: string[],
+  subjects: SubjectRow[],
+): number[] => {
   const normalizedDirections = directions
     .map((value) => normalizeText(value))
     .filter((value) => value.length > 0);
@@ -320,8 +336,8 @@ const findMatchingSubjectIds = (directions: string[], subjects: SubjectRow[]): n
           (alias) =>
             direction === alias ||
             direction.includes(alias) ||
-            alias.includes(direction)
-        )
+            alias.includes(direction),
+        ),
       );
     })
     .map((subject) => subject.id);
@@ -329,7 +345,7 @@ const findMatchingSubjectIds = (directions: string[], subjects: SubjectRow[]): n
 
 const fetchDbRecommendations = async (
   directions: string[],
-  locale: string
+  locale: string,
 ): Promise<DbRecommendation[]> => {
   const subjectRows = await sql`
     SELECT id, code, name_ru, name_kz
@@ -449,8 +465,7 @@ const generateAiRecommendations = async (input: {
         strict: true,
       },
     },
-    temperature: 0.3,
-    max_output_tokens: 1300,
+    max_output_tokens: 8000,
   };
 
   const response = await fetch(endpoint, {
@@ -498,7 +513,12 @@ export const registerOnboardingRecommendationRoutes = (app: Elysia) => {
       return fail(set, 401, "unauthorized", "Unauthorized.");
     }
     if (user.role !== "student") {
-      return fail(set, 403, "forbidden", "Only students can generate onboarding recommendations.");
+      return fail(
+        set,
+        403,
+        "forbidden",
+        "Only students can generate onboarding recommendations.",
+      );
     }
     if (!isRecord(body)) {
       return fail(set, 400, "validation_error", "Invalid request body.");
@@ -508,28 +528,55 @@ export const registerOnboardingRecommendationRoutes = (app: Elysia) => {
       return fail(set, 400, "validation_error", "directions are required.");
     }
     if (!Array.isArray(body.directions)) {
-      return fail(set, 400, "validation_error", "directions must be an array of strings.");
+      return fail(
+        set,
+        400,
+        "validation_error",
+        "directions must be an array of strings.",
+      );
     }
 
     const directions = (body.directions as unknown[])
       .map((entry) => asString(entry))
       .filter((entry): entry is string => entry !== null);
     if (directions.length === 0) {
-      return fail(set, 400, "validation_error", "directions must include at least one item.");
+      return fail(
+        set,
+        400,
+        "validation_error",
+        "directions must include at least one item.",
+      );
     }
 
     const goalsText = getNullableString(body.goals_text);
-    if (typeof goalsText === "undefined" || goalsText === null || goalsText.trim().length === 0) {
-      return fail(set, 400, "validation_error", "goals_text must be a non-empty string.");
+    if (
+      typeof goalsText === "undefined" ||
+      goalsText === null ||
+      goalsText.trim().length === 0
+    ) {
+      return fail(
+        set,
+        400,
+        "validation_error",
+        "goals_text must be a non-empty string.",
+      );
     }
 
     const grade = body.grade === null ? null : getInteger(body.grade);
     if (grade === null || grade < 1 || grade > 12) {
-      return fail(set, 400, "validation_error", "grade must be between 1 and 12.");
+      return fail(
+        set,
+        400,
+        "validation_error",
+        "grade must be between 1 and 12.",
+      );
     }
 
     try {
-      const dbRecommendations = await fetchDbRecommendations(directions, user.locale);
+      const dbRecommendations = await fetchDbRecommendations(
+        directions,
+        user.locale,
+      );
       const warnings: string[] = [];
       let aiRecommendations: AiRecommendations | null = null;
 
@@ -563,7 +610,7 @@ export const registerOnboardingRecommendationRoutes = (app: Elysia) => {
         set,
         error,
         "onboarding_recommendations_failed",
-        "Failed to generate onboarding recommendations."
+        "Failed to generate onboarding recommendations.",
       );
     }
   });
